@@ -9,6 +9,7 @@
 import aiohttp
 import logging
 import asyncio
+import os
 from datetime import datetime
 from typing import List, Dict, Optional
 
@@ -22,10 +23,8 @@ class BravoNewsFetcher:
     """
     
     def __init__(self, api_key: str = None):
-        import os
-        self.api_key = api_key or os.getenv("BRAVO_API_KEY") or "DEMO_KEY"
-        self.base_url = "https://api.search.brave.com/res/v1/news/search" # Example
-
+        self.api_key = api_key or os.getenv("BRAVE_API_KEY") or "DEMO_KEY"
+        self.base_url = "https://api.search.brave.com/res/v1/news/search"
         
     async def get_latest_news(self, query: str = "football injuries") -> List[Dict]:
         """
@@ -36,9 +35,16 @@ class BravoNewsFetcher:
             
         try:
             async with aiohttp.ClientSession() as session:
-                # Placeholder implementation for real API
-                headers = {"Authorization": f"Bearer {self.api_key}"}
+                headers = {
+                    "Accept": "application/json",
+                    "X-Subscription-Token": self.api_key
+                }
                 params = {"q": query, "freshness": "Day", "count": 5}
+                
+                # Brave Search API requires Subscription Token in header
+                # If using generic Bravo, logic might differ.
+                # Assuming Standard Brave Search API usage.
+                
                 async with session.get(self.base_url, params=params, headers=headers) as resp:
                     if resp.status == 200:
                         data = await resp.json()
@@ -54,7 +60,14 @@ class BravoNewsFetcher:
         """Демо-данные для демонстрации работы"""
         return [
             {
-                "title": "Mbappé hamstring injury concern ahead of El Clásico",
+                "title": f"Partial news for query '{query}' (Demo)",
+                "source": "Bravo Sports",
+                "published_at": datetime.utcnow().isoformat(),
+                "url": "https://example.com/news/1",
+                "snippet": "This is a demo snippet because the API key might be invalid or quota exceeded."
+            },
+            {
+                "title": "Mbappé hamstring injury concern",
                 "source": "Bravo Sports",
                 "published_at": datetime.utcnow().isoformat(),
                 "url": "https://example.com/news/1",
@@ -66,17 +79,25 @@ class BravoNewsFetcher:
                 "published_at": datetime.utcnow().isoformat(),
                 "url": "https://example.com/news/2",
                 "snippet": "Man City playmaker Kevin De Bruyne is back in contention for the weekend clash..."
-            },
-            {
-                "title": "Barcelona defender Araujo ruled out for 3 weeks",
-                "source": "Catalan Daily",
-                "published_at": datetime.utcnow().isoformat(),
-                "url": "https://example.com/news/3",
-                "snippet": "Ronald Araujo suffered a muscle tear and will miss the upcoming Champions League fixtures..."
             }
         ]
 
     def _parse_response(self, data: dict) -> List[Dict]:
-        """Парсинг реального ответа (заглушка)"""
-        # Adapt to actual API schema
-        return []
+        """Парсинг реального ответа Brave Search"""
+        # API Response structure: { "results": [ { "title": "...", "url": "...", "description": "...", "age": "..." } ] }
+        results = []
+        try:
+            items = data.get("results", [])
+            for item in items:
+                results.append({
+                    "title": item.get("title", "No Title"),
+                    "source": item.get("source", {}).get("name", "Brave Search"), # Source structure varies
+                    "published_at": item.get("age", datetime.utcnow().isoformat()),
+                    "url": item.get("url", "#"),
+                    "snippet": item.get("description", "")[:200]
+                })
+        except Exception as e:
+            logger.error(f"Error parsing Brave response: {e}")
+        return results
+
+
