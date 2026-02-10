@@ -7,7 +7,14 @@ load_dotenv()
 
 async def test_conn():
     db_url = os.getenv("DATABASE_URL")
-    print(f"Testing connection to: {db_url.split('@')[1]}")
+    if not db_url:
+        print("⏭️ Skipping DB test: DATABASE_URL not set.")
+        return
+    
+    # Mask password for logging
+    target = db_url.split('@')[1] if '@' in db_url else db_url
+    print(f"Testing connection to: {target}")
+    
     try:
         engine = create_async_engine(db_url, connect_args={"ssl": False})
         async with engine.connect() as conn:

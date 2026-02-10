@@ -34,8 +34,15 @@ feedparser==6.0.11        # RSS parsing for InjuryScanner
 torch==2.3.0              # LSTM models
 tqdm==4.66.4
 
-# --- Dev / Testing ---
+# --- Dev / Testing / Web ---
+fastapi==0.115.0
+uvicorn[standard]==0.30.1
+pydantic==2.9.2
 pytest==8.3.3
 pytest-asyncio==0.24.0
+pytest-cov==5.0.0
 black==24.10.0
 ruff==0.7.4
+aiosqlite==0.20.0          # For SQLite support in tests/dev
+httpx==0.27.2              # For FastAPI testing
+python-multipart==0.0.9    # For FastAPI form parsing
