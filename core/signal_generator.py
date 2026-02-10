@@ -71,6 +71,7 @@ class SignalGenerator:
         # AI Analyst & News
         self.ai_analyzer = AIAnalyzer()
         self.news_fetcher = BravoNewsFetcher()
+        self.ai_semaphore = asyncio.Semaphore(1) # Limit AI calls to prevent 429
 
     async def run_scan(self) -> dict:
         """Полное сканирование рынка"""
@@ -242,7 +243,7 @@ class SignalGenerator:
 
         return {
             "timestamp": datetime.utcnow().isoformat(),
-            "matches_scanned": total,
+            "matches_scanned": matches_count,
             "singles": active,
             "expresses": active_exp,
             "systems": systems,
@@ -400,28 +401,29 @@ class SignalGenerator:
         """
         Дополняет сигнал новостями и AI-анализом (NVIDIA NIM).
         """
-        try:
-            # 1. Сбор новостей (Bravo/Brave)
-            query = f"{s.match.home_team} {s.match.away_team} football news injuries"
-            news = await self.news_fetcher.get_latest_news(query)
-            
-            # 2. Генерация анализа через AI (Llama-3 через NVIDIA NIM)
-            ai_text = await self.ai_analyzer.generate_analysis(s, news)
-            
-            # 3. Технические детали
-            tech_reasons = []
-            if s.edge >= 0.05: tech_reasons.append(f"🔥 Высокий перевес: +{s.edge:.1%}")
-            if s.sharp_agrees: tech_reasons.append("🎯 Консенсус с острыми линиями")
-            if s.lstm_prediction: 
-                trend = "ВВЕРХ" if s.lstm_prediction.get('expected_move', 0) > 0 else "ВНИЗ"
-                tech_reasons.append(f"📈 LSTM тренд: {trend}")
-            
-            tech_str = "\n".join(tech_reasons)
-            s.analysis = f"{ai_text}\n\n{tech_str}" if tech_str else ai_text
-            
-        except Exception as e:
-            logger.error(f"Enrichment failed for {s.id}: {e}")
-            s.analysis = "Технический анализ: Ставка подтверждена математической моделью."
+        async with self.ai_semaphore:  # Prevent 429 Too Many Requests
+            try:
+                # 1. Сбор новостей (Bravo/Brave)
+                query = f"{s.match.home_team} {s.match.away_team} football news injuries"
+                news = await self.news_fetcher.get_latest_news(query)
+                
+                # 2. Генерация анализа через AI (Llama-3 через NVIDIA NIM)
+                ai_text = await self.ai_analyzer.generate_analysis(s, news)
+                
+                # 3. Технические детали
+                tech_reasons = []
+                if s.edge >= 0.05: tech_reasons.append(f"🔥 Высокий перевес: +{s.edge:.1%}")
+                if s.sharp_agrees: tech_reasons.append("🎯 Консенсус с острыми линиями")
+                if s.lstm_prediction: 
+                    trend = "ВВЕРХ" if s.lstm_prediction.get('expected_move', 0) > 0 else "ВНИЗ"
+                    tech_reasons.append(f"📈 LSTM тренд: {trend}")
+                
+                tech_str = "\n".join(tech_reasons)
+                s.analysis = f"{ai_text}\n\n{tech_str}" if tech_str else ai_text
+                
+            except Exception as e:
+                logger.error(f"Enrichment failed for {s.id}: {e}")
+                s.analysis = "Технический анализ: Ставка подтверждена математической моделью."
 
     def _generate_analysis(self, s: ValueSignal) -> str:
         reasons = []
