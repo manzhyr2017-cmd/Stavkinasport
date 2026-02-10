@@ -1,0 +1,60 @@
+# ═══════════════════════════════════════════════════════════════════
+# .gitignore — ЧИСТЫЙ для Betting Assistant
+# ═══════════════════════════════════════════════════════════════════
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+*.egg
+dist/
+build/
+
+# Виртуальное окружение
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Секреты
+.env
+*.pem
+*.key
+
+# Базы данных (НЕ хранить в Git!)
+*.db
+*.sqlite3
+*.sql.bak
+
+# Архивы старых версий (НЕ хранить в Git!)
+*.zip
+*.tar.gz
+*.rar
+
+# Логи
+*.log
+logs/
+
+# Модели (большие файлы)
+models/*.cbm
+models/*.pt
+models/*.pkl
+models/*.joblib
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Старые версии (папки)
+Stavki3/
+stavki4/
+Stavki4.1/

@@ -14,6 +14,8 @@
    - ODDSCORP API (платный, api.oddscp.com) — агрегатор
    - OddsAPI.ru — альтернативный агрегатор
 
+
+
  Маржа Фонбет по видам спорта (данные 2025):
    - Футбол (АПЛ, Бундеслига): 4-5%
    - Футбол (Серия А, Ла Лига): 5-5.5%
@@ -36,6 +38,9 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple
+
+
+from core.fonbet_health import FonbetEndpointManager
 
 logger = logging.getLogger(__name__)
 
@@ -331,13 +336,7 @@ class FonbetParser:
     }
 
     def __init__(self):
-        self._base_urls = [
-            "https://line1.bk6.top",
-            "https://line2.bk6.top",
-            "https://line3.bk6.top",
-            "https://clientsapi27.bk6.top",
-            "https://clientsapi29.bk6.top",
-        ]
+        self.endpoint_manager = FonbetEndpointManager()
         self._session = None
 
     async def _get_session(self):
@@ -359,20 +358,9 @@ class FonbetParser:
         return self._session
 
     async def fetch_line(self, live: bool = False) -> List[RuMatch]:
-        """Получить линию (прематч или лайв)"""
-        endpoint = "/live/currentLine/ru" if live else "/line/currentLine/ru"
-        base = random.choice(self._base_urls)
-        url = f"{base}{endpoint}?r={random.random()}"
-
-        try:
-            session = await self._get_session()
-            async with session.get(url) as resp:
-                if resp.status != 200:
-                    logger.warning(f"Fonbet API {resp.status}: {url}")
-                    return []
-                data = await resp.json()
-        except Exception as e:
-            logger.error(f"Fonbet fetch error: {e}")
+        """Получить линию (прематч или лайв) с авто-восстановлением"""
+        data = await self.endpoint_manager.fetch_with_fallback(live=live)
+        if not data:
             return []
 
         # Offload parsing to thread (CPU bound)
