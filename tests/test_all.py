@@ -33,10 +33,11 @@ class TestFonbetParser:
         from core.ai_analyzer import AIAnalyzer
         key = os.getenv("NVIDIA_API_KEY")
         if not key:
+            # В CI это может быть не установлено, пропускаем
             pytest.skip("NVIDIA_API_KEY not set")
         
         analyzer = AIAnalyzer(key)
-        assert analyzer.model is not None
+        assert analyzer.model == "meta/llama3-70b-instruct"
 
     def test_sport_map_coverage(self):
         """Все основные виды спорта замаплены"""
@@ -352,8 +353,9 @@ class TestConfig:
     def test_insurance_presets(self):
         """Пресеты страховки загружаются"""
         from config.ru_config import ru_config
-        assert ru_config.express.INSURANCE_MIN_LEGS >= 5
-        assert ru_config.express.INSURANCE_MIN_ODDS >= 1.40
+        preset = ru_config.get_active_insurance()
+        assert preset.min_legs >= 5
+        assert preset.min_leg_odds >= 1.40
         assert ru_config.bankroll.KELLY_FRACTION <= 0.30
 
     def test_margins_reasonable(self):
