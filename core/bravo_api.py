@@ -22,8 +22,10 @@ class BravoNewsFetcher:
     """
     
     def __init__(self, api_key: str = None):
-        self.api_key = api_key or "DEMO_KEY"
-        self.base_url = "https://api.bravo-news.com/v1/search" # Placeholder URL
+        import os
+        self.api_key = api_key or os.getenv("BRAVO_API_KEY") or "DEMO_KEY"
+        self.base_url = "https://api.search.brave.com/res/v1/news/search" # Example
+
         
     async def get_latest_news(self, query: str = "football injuries") -> List[Dict]:
         """
