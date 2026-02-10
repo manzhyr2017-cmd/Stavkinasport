@@ -6,7 +6,7 @@
 """
 import asyncio
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Dict, List, Optional
 
 from config.settings import betting_config, api_config
@@ -250,7 +250,7 @@ class SignalGenerator:
         self._signals_today.extend(active)
 
         return {
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
             "matches_scanned": matches_count,
             "singles": active,
             "expresses": active_exp,
@@ -464,7 +464,7 @@ class SignalGenerator:
                             stake_amount=s.stake_amount,
                             status=s.status.value if hasattr(s.status, 'value') else str(s.status),
                             ai_analysis=s.analysis,
-                            metadata={
+                            meta_payload={
                                 "lstm_trend": s.lstm_prediction.get('expected_move') if s.lstm_prediction else 0,
                                 "sharp_agrees": s.sharp_agrees
                             }

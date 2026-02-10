@@ -5,7 +5,7 @@
 =============================================================================
 """
 import logging
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from sqlalchemy import BigInteger, Column, DateTime, Float, String, Boolean, JSON, ForeignKey
@@ -37,7 +37,7 @@ class MatchHistory(Base):
     pinnacle_draw = Column(Float, nullable=True)
     pinnacle_away = Column(Float, nullable=True)
     date = Column(DateTime)
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
 class SignalLog(Base):
     __tablename__ = "signal_logs"
@@ -58,14 +58,14 @@ class SignalLog(Base):
     result_score = Column(String, nullable=True) # "2-1"
     closing_odds = Column(Float, nullable=True)
     ai_analysis = Column(String, nullable=True)
-    metadata = Column(JSON, nullable=True)        # Store xG stats, news snippets at bet time
-    created_at = Column(DateTime, default=datetime.utcnow)
+    meta_payload = Column(JSON, nullable=True)        # Store xG stats, news snippets at bet time
+    created_at = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
 class BankrollSnapshot(Base):
     __tablename__ = "bankroll_snapshots"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
-    timestamp = Column(DateTime, default=datetime.utcnow)
+    timestamp = Column(DateTime, default=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
     balance = Column(Float)
     equity = Column(Float)  # balance + floating stakes
     daily_pnl = Column(Float)

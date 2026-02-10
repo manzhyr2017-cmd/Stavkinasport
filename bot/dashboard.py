@@ -21,7 +21,7 @@
 import asyncio
 import json
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List, Optional
 from core.fonbet_strategies import HedgeCalculator, CashoutAdvisor, SuperExpressGenerator
 
@@ -271,13 +271,13 @@ def create_app(signal_generator=None, bankroll_manager=None):
         state["signals"] = result.get("singles", [])
         state["expresses"] = result.get("expresses", [])
         state["systems"] = result.get("systems", [])
-        state["last_scan"] = datetime.utcnow()
+        state["last_scan"] = datetime.now(timezone.utc).replace(tzinfo=None)
 
         # Record bankroll history
         bm = state.get("bankroll")
         if bm:
             state["bankroll_history"].append({
-                "date": datetime.utcnow().isoformat(),
+                "date": datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
                 "bankroll": bm.bankroll,
                 "pnl": bm._daily_pnl,
             })
@@ -294,7 +294,7 @@ def create_app(signal_generator=None, bankroll_manager=None):
             singles=len(state["signals"]),
             expresses=len(state["expresses"]),
             systems=len(state.get("systems", [])),
-            timestamp=datetime.utcnow().isoformat(),
+            timestamp=datetime.now(timezone.utc).replace(tzinfo=None).isoformat(),
         )
 
     @app.post("/api/bet/settle")
@@ -622,9 +622,12 @@ REACT_DASHBOARD_HTML = """
                             {s.analysis && (
                                 <tr>
                                     <td colSpan="8" className="px-4 pb-4 pt-0">
-                                        <div className="bg-white/[0.02] border border-white/5 rounded-lg p-3 text-xs text-gray-400 leading-relaxed italic">
-                                            <span className="text-blue-400 font-bold not-italic mr-2">🧠 AI ANALYSIS:</span>
-                                            {s.analysis.split('\n')[0]}
+                                        <div className="bg-white/[0.02] border border-white/5 rounded-lg p-4 text-xs text-gray-300 leading-relaxed font-mono">
+                                            <div className="text-blue-400 font-bold mb-2 flex items-center gap-2">
+                                                <span>🧠 AI ANALYTICS & JUSTIFICATION</span>
+                                                <div className="h-[1px] flex-1 bg-blue-500/20"></div>
+                                            </div>
+                                            <div className="whitespace-pre-wrap">{s.analysis}</div>
                                         </div>
                                     </td>
                                 </tr>
