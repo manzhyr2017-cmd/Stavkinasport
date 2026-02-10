@@ -15,4 +15,5 @@ env/
 # Project Data
 data/*.json
 data/*.db
+*.db
 *.log
