@@ -1,0 +1,41 @@
+# =============================================================================
+# BETTING ASSISTANT V2 — DEPENDENCIES
+# pip install -r requirements.txt
+# =============================================================================
+
+# --- Core ---
+python-dotenv==1.0.1
+aiohttp==3.9.5
+
+# --- Telegram Bot ---
+aiogram==3.13.1
+
+# --- Database ---
+sqlalchemy[asyncio]==2.0.35
+asyncpg==0.29.0
+redis[hiredis]==5.2.1
+
+# --- ML / Data Science ---
+pandas==2.2.3
+numpy==1.26.4
+scipy==1.14.1             # Dixon-Coles optimization (minimize)
+scikit-learn==1.5.2       # Probability calibration (isotonic/platt)
+catboost==1.2.7           # Gradient boosting (optional, for Phase 2)
+
+# --- Rating Systems ---
+elote==1.1.0              # Elo / Glicko-2 implementations
+
+# --- Football Analytics ---
+penaltyblog==1.6.2        # Dixon-Coles optimized (Cython), data scraping
+soccerdata==1.7.0         # FBRef, Understat, etc.
+feedparser==6.0.11        # RSS parsing for InjuryScanner
+
+# --- Deep Learning (Stavki3 Integration) ---
+torch==2.3.0              # LSTM models
+tqdm==4.66.4
+
+# --- Dev / Testing ---
+pytest==8.3.3
+pytest-asyncio==0.24.0
+black==24.10.0
+ruff==0.7.4

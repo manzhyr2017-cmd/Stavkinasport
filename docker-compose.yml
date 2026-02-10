@@ -1,0 +1,60 @@
+version: "3.9"
+
+services:
+  # === Betting Assistant Bot ===
+  bot:
+    build: .
+    container_name: betting-assistant
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    volumes:
+      - ./models:/app/models
+      - ./logs:/app/logs
+    networks:
+      - betting-net
+
+  # === PostgreSQL ===
+  postgres:
+    image: postgres:16-alpine
+    container_name: betting-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: betting_db
+      POSTGRES_USER: user
+      POSTGRES_PASSWORD: password
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U user -d betting_db"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - betting-net
+
+  # === Redis ===
+  redis:
+    image: redis:7-alpine
+    container_name: betting-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    networks:
+      - betting-net
+
+volumes:
+  pgdata:
+  redisdata:
+
+networks:
+  betting-net:
+    driver: bridge
