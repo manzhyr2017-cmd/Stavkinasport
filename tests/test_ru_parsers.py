@@ -16,7 +16,13 @@ PROXY = os.getenv("PROXY_URL")
 if PROXY:
     print(f"Using proxy: {PROXY}")
 
+import pytest
+
+@pytest.mark.asyncio
 async def test_parsers():
+    if os.getenv("GITHUB_ACTIONS") == "true":
+        pytest.skip("Skipping network parser tests in GitHub Actions")
+    
     print("--- Testing Fonbet Parser ---")
     fb = FonbetParser()
     fb_matches = await fb.fetch_odds()
