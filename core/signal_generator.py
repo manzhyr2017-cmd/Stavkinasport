@@ -15,6 +15,8 @@ from core.models import ExpressBet, SystemBet, ValueSignal, Match, Market, BetOu
 from core.prediction_models import DixonColesModel, EloRatingSystem, EnsemblePredictor
 from core.value_engine import ValueBettingEngine
 from data.odds_fetcher import OddsDataFetcher
+from core.ai_analyzer import AIAnalyzer
+from core.bravo_api import BravoNewsFetcher
 
 try:
     from core.live_monitor import LSTMLinePredictor, OddsTimeSeriesCollector
@@ -65,6 +67,10 @@ class SignalGenerator:
                 logger.info("🇷🇺 Russian Betting Assistant (Fonbet) Enabled")
             except ImportError:
                 logger.error("❌ Could not import RuBettingAssistant")
+
+        # AI Analyst & News
+        self.ai_analyzer = AIAnalyzer()
+        self.news_fetcher = BravoNewsFetcher()
 
     async def run_scan(self) -> dict:
         """Полное сканирование рынка"""
@@ -148,11 +154,17 @@ class SignalGenerator:
             )
 
         active = []
+        enrichment_tasks = []
+
         for s in all_signals:
-            if s.stake_amount > 0 and s.edge >= betting_config.AUTO_BET_MIN_EDGE:
-                # Generate Analysis for EVERY signal (manual or auto)
-                s.analysis = self._generate_analysis(s)
+            if s.stake_amount > 0 and s.edge >= betting_config.MIN_VALUE_EDGE:
+                # Создаем задачу на обогащение (новости + AI)
+                enrichment_tasks.append(self._enrich_signal(s))
                 active.append(s)
+        
+        if enrichment_tasks:
+            logger.info(f"🧠 Enriching {len(enrichment_tasks)} signals with AI & News...")
+            await asyncio.gather(*enrichment_tasks)
         
         # AUTO-BET LOGIC
         # AUTO-BET LOGIC
@@ -383,6 +395,33 @@ class SignalGenerator:
             converted.append(eb)
             
         return converted
+
+    async def _enrich_signal(self, s: ValueSignal):
+        """
+        Дополняет сигнал новостями и AI-анализом (NVIDIA NIM).
+        """
+        try:
+            # 1. Сбор новостей (Bravo/Brave)
+            query = f"{s.match.home_team} {s.match.away_team} football news injuries"
+            news = await self.news_fetcher.get_latest_news(query)
+            
+            # 2. Генерация анализа через AI (Llama-3 через NVIDIA NIM)
+            ai_text = await self.ai_analyzer.generate_analysis(s, news)
+            
+            # 3. Технические детали
+            tech_reasons = []
+            if s.edge >= 0.05: tech_reasons.append(f"🔥 Высокий перевес: +{s.edge:.1%}")
+            if s.sharp_agrees: tech_reasons.append("🎯 Консенсус с острыми линиями")
+            if s.lstm_prediction: 
+                trend = "ВВЕРХ" if s.lstm_prediction.get('expected_move', 0) > 0 else "ВНИЗ"
+                tech_reasons.append(f"📈 LSTM тренд: {trend}")
+            
+            tech_str = "\n".join(tech_reasons)
+            s.analysis = f"{ai_text}\n\n{tech_str}" if tech_str else ai_text
+            
+        except Exception as e:
+            logger.error(f"Enrichment failed for {s.id}: {e}")
+            s.analysis = "Технический анализ: Ставка подтверждена математической моделью."
 
     def _generate_analysis(self, s: ValueSignal) -> str:
         reasons = []

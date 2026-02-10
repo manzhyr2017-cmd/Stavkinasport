@@ -28,6 +28,10 @@ class APIConfig:
     # API-Football via RapidAPI — xG, статистика
     RAPID_API_KEY: str = os.getenv("RAPID_API_KEY", "")
     API_FOOTBALL_HOST: str = "v3.football.api-sports.io"
+    # NVIDIA AI (NIM)
+    NVIDIA_API_KEY: str = os.getenv("NVIDIA_API_KEY", "")
+    # Brave Search (News)
+    BRAVE_API_KEY: str = os.getenv("BRAVE_API_KEY", "")
 
 
 # ═══════════════════════════════════════════════════════════
