@@ -33,6 +33,7 @@ from aiogram.types import (
 
 from config.settings import betting_config, tg_config
 from core.models import ExpressBet, SystemBet, ValueSignal
+from core.bravo_api import BravoNewsFetcher
 
 logger = logging.getLogger(__name__)
 
@@ -111,8 +112,10 @@ class TelegramNotifier:
 # ===================================================================
 
 # Глобальные ссылки (устанавливаются при запуске)
+# Глобальные ссылки (устанавливаются при запуске)
 _signal_generator = None
 _bankroll_manager = None
+_news_fetcher = BravoNewsFetcher()
 
 
 def setup_handlers(signal_generator, bankroll_manager):
@@ -130,11 +133,15 @@ async def cmd_start(message: Message):
     keyboard = InlineKeyboardMarkup(inline_keyboard=[
         [
             InlineKeyboardButton(text="🔍 Сканировать", callback_data="action:scan"),
-            InlineKeyboardButton(text="📊 Банкролл", callback_data="action:bankroll"),
+            InlineKeyboardButton(text="📰 Новости (Bravo)", callback_data="action:news"),
         ],
         [
             InlineKeyboardButton(text="🎯 Сигналы", callback_data="action:signals"),
+            InlineKeyboardButton(text="🛡 Стратегии", callback_data="action:strategies"),
+        ],
+        [
             InlineKeyboardButton(text="🔥 Экспрессы", callback_data="action:express"),
+            InlineKeyboardButton(text="📊 Банкролл", callback_data="action:bankroll"),
         ],
         [
             InlineKeyboardButton(text="⚙️ Настройки", callback_data="action:settings"),
@@ -235,6 +242,50 @@ async def cmd_settings(message: Message):
         parse_mode=ParseMode.HTML,
     )
 
+@router.message(Command("news"))
+async def cmd_news(message: Message):
+    """
+    Получить последние новости через Bravo API.
+    """
+    args = message.text.split(maxsplit=1)
+    query = args[1] if len(args) > 1 else "football injuries news"
+    
+    await message.answer(f"🔍 Ищу новости по запросу: '{query}'...")
+    
+    news = await _news_fetcher.get_latest_news(query)
+    
+    if not news:
+        await message.answer("❌ Новости не найдены.")
+        return
+
+    text = f"📰 <b>News Feed (Bravo API)</b>\n\n"
+    for item in news[:3]:
+        text += (
+            f"🔹 <a href='{item['url']}'><b>{item['title']}</b></a>\n"
+            f"<i>{item['source']} • {item['published_at'][:10]}</i>\n"
+            f"{item['snippet']}\n\n"
+        )
+    
+    await message.answer(text, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
+
+
+@router.message(Command("strategies"))
+async def cmd_strategies(message: Message):
+    """
+    Показать активные стратегии (Hedge/Cashout).
+    """
+    # Demo logic similar to dashboard
+    text = (
+        "🛡 <b>Hedge Strategies (Противоход)</b>\n\n"
+        "⚡ <b>Express #EXP_DEMO</b>\n"
+        "✅ 4 / 5 Legs Passed\n"
+        "💰 Guaranteed Profit: +1,250₽\n"
+        "📉 Recommendation: <b>Bet 2,500₽ on Draw/Lose @ 3.20</b>\n"
+        "NEXT: Real Madrid (vs Barcelona)\n\n"
+        "<i>Используйте веб-дашборд для управления стратегиями.</i>"
+    )
+    await message.answer(text, parse_mode=ParseMode.HTML)
+
 
 @router.message(Command("help"))
 async def cmd_help(message: Message):
@@ -286,6 +337,10 @@ async def handle_action(callback: CallbackQuery):
         await callback.message.answer(
             "🔥 Экспрессы формируются автоматически после /scan"
         )
+    elif action == "news":
+        await cmd_news(callback.message)
+    elif action == "strategies":
+        await cmd_strategies(callback.message)
 
     await callback.answer()
 

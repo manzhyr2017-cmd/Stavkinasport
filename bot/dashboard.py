@@ -23,6 +23,7 @@ import json
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
+from core.fonbet_strategies import HedgeCalculator, CashoutAdvisor, SuperExpressGenerator
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +104,11 @@ if HAS_FASTAPI:
     class SettleBetRequest(BaseModel):
         signal_id: str
         result: str  # won, lost, void
+
+    class StrategiesResponse(BaseModel):
+        hedges: List[dict]
+        cashouts: List[dict]
+        toto: List[dict]
 
 
 # ─── ENDPOINTS ───
@@ -287,12 +293,27 @@ def create_app(signal_generator=None, bankroll_manager=None):
         return {"status": "settled", "signal_id": req.signal_id,
                 "result": req.result}
 
-    @app.get("/api/model/metrics")
-    async def model_metrics():
-        """Метрики последнего обучения CatBoost"""
+
+
+    @app.get("/api/strategies", response_model=StrategiesResponse)
+    async def get_strategies():
+        """Получить рекомендации по стратегиям (Hedge, Cashout, TOTO)"""
+        # Mock logic for demonstration until live monitoring is fully active
+        # In real scenario, we would iterate active bets and check status
+        
         return {
-            "note": "Train model first with: python -m core.ml_pipeline",
-            "placeholder": True,
+            "hedges": [
+                {
+                    "express_id": "exp_123", 
+                    "legs_passed": 4, 
+                    "legs_total": 5,
+                    "profit_guaranteed": 1250, 
+                    "roi": 0.12,
+                    "recommendation": "Bet 2500₽ on Draw (X) @ 3.20"
+                }
+            ],
+            "cashouts": [],
+            "toto": []
         }
 
     @app.get("/")
@@ -371,6 +392,7 @@ REACT_DASHBOARD_HTML = """
       const [signals, setSignals] = useState([]);
       const [expresses, setExpresses] = useState([]);
       const [history, setHistory] = useState([]);
+      const [strategies, setStrategies] = useState({hedges: [], cashouts: []});
       const [scanning, setScanning] = useState(false);
 
       const [sortConfig, setSortConfig] = useState({ key: 'edge', direction: 'desc' });
@@ -408,16 +430,18 @@ REACT_DASHBOARD_HTML = """
 
       const fetchData = async () => {
         try {
-          const [bRes, sRes, eRes, hRes] = await Promise.all([
+          const [bRes, sRes, eRes, hRes, stratRes] = await Promise.all([
             fetch(API + '/bankroll').then(r => r.json()),
             fetch(API + '/signals').then(r => r.json()),
             fetch(API + '/expresses').then(r => r.json()),
             fetch(API + '/history').then(r => r.json()),
+            fetch(API + '/strategies').then(r => r.json()),
           ]);
           setBankroll(bRes);
           setSignals(sRes);
           setExpresses(eRes);
           setHistory(hRes || []);
+          setStrategies(stratRes || {hedges: [], cashouts: []});
         } catch(e) { console.error(e); }
       };
 
@@ -460,15 +484,14 @@ REACT_DASHBOARD_HTML = """
               <p className="text-gray-400 mt-1 text-center md:text-left">Интеллектуальный поиск Value Bets</p>
             </div>
             
+
             <div className="flex space-x-4">
-                 <button onClick={() => setView('dashboard')} 
-                    className={`px-6 py-2 rounded-full font-bold transition-all ${view === 'dashboard' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'bg-white/5 text-gray-400 hover:text-white'}`}>
-                    Дашборд
-                 </button>
-                 <button onClick={() => setView('history')} 
-                    className={`px-6 py-2 rounded-full font-bold transition-all ${view === 'history' ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'bg-white/5 text-gray-400 hover:text-white'}`}>
-                    История ({history.length})
-                 </button>
+                 {['dashboard', 'strategies', 'history'].map(tab => (
+                   <button key={tab} onClick={() => setView(tab)} 
+                      className={`px-6 py-2 rounded-full font-bold transition-all uppercase text-sm ${view === tab ? 'bg-blue-600 text-white shadow-lg shadow-blue-900/50' : 'bg-white/5 text-gray-400 hover:text-white'}`}>
+                      {tab}
+                   </button>
+                 ))}
             </div>
 
             <button onClick={triggerScan} disabled={scanning}
@@ -636,6 +659,55 @@ REACT_DASHBOARD_HTML = """
                     </tbody>
                   </table>
                 </div>
+              </section>
+           )}
+
+           {view === 'strategies' && (
+              <section className="space-y-8">
+                  <div className="glass rounded-2xl p-8 border-l-4 border-purple-500">
+                    <h2 className="text-2xl font-bold mb-4 flex items-center gap-3">
+                        <span className="text-3xl">🛡️</span> Hedge Strategies (Противоход)
+                    </h2>
+                    <p className="text-gray-400 mb-6">Бот автоматически предлагает хеджирование для экспрессов, где прошла большая часть событий.</p>
+                    
+                    {/* Hedges List */}
+                    {strategies && strategies.hedges && strategies.hedges.length > 0 ? (
+                        strategies.hedges.map((h, i) => (
+                            <div key={i} className="bg-white/5 rounded-xl p-6 border border-white/10 mb-4">
+                                <div className="flex justify-between items-start mb-4">
+                                    <div>
+                                        <div className="text-sm text-gray-500 uppercase font-bold">Express #{h.express_id}</div>
+                                        <div className="text-xl font-bold text-white">{h.legs_passed} / {h.legs_total} Legs Passed</div>
+                                    </div>
+                                    <div className="text-green-400 font-bold bg-green-500/10 px-3 py-1 rounded">+{h.profit_guaranteed}₽ Guaranteed</div>
+                                </div>
+                                <div className="flex gap-4 items-center bg-black/30 p-4 rounded-lg">
+                                    <div className="flex-1">
+                                        <div className="text-sm text-gray-500">Next Leg</div>
+                                        <div className="font-bold">Pending...</div>
+                                    </div>
+                                    <div className="text-2xl">⚡</div>
+                                    <div className="flex-1 text-right">
+                                        <div className="text-sm text-gray-500">Hedge Recommendation</div>
+                                        <div className="font-bold text-blue-400">{h.recommendation}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        ))
+                    ) : (
+                        <div className="text-center py-8 text-gray-500 font-mono bg-white/5 rounded-xl">
+                            No active hedge recommendations.
+                        </div>
+                    )}
+                  </div>
+
+                  <div className="glass rounded-2xl p-8 border-l-4 border-yellow-500">
+                    <h2 className="text-2xl font-bold mb-4 flex items-center gap-3">
+                        <span className="text-3xl">💰</span> Cashout Monitor
+                    </h2>
+                    <p className="text-gray-400">Мониторинг предложений досрочной выплаты от букмекера.</p>
+                    <div className="text-center py-8 text-gray-500 font-mono">No active cashout opportunities.</div>
+                  </div>
               </section>
            )}
         </div>
