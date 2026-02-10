@@ -157,14 +157,19 @@ class SignalGenerator:
         active = []
         enrichment_tasks = []
 
-        for s in all_signals:
-            if s.stake_amount > 0 and s.edge >= betting_config.MIN_VALUE_EDGE:
-                # Создаем задачу на обогащение (новости + AI)
-                enrichment_tasks.append(self._enrich_signal(s))
-                active.append(s)
+        # Сортируем все сигналы по убыванию перевеса (Edge), чтобы отобрать лучшие
+        valuable_signals = [s for s in all_signals if s.stake_amount > 0 and s.edge >= betting_config.MIN_VALUE_EDGE]
+        valuable_signals.sort(key=lambda x: x.edge, reverse=True)
+
+        # Обогащаем только ТОП-15 сигналов (чтобы не ждать AI вечно и не ловить 429)
+        top_candidates = valuable_signals[:15]
+
+        for s in top_candidates:
+            enrichment_tasks.append(self._enrich_signal(s))
+            active.append(s)
         
         if enrichment_tasks:
-            logger.info(f"🧠 Enriching {len(enrichment_tasks)} signals with AI & News...")
+            logger.info(f"🧠 Enriching Top-{len(enrichment_tasks)} signals with AI & News...")
             await asyncio.gather(*enrichment_tasks)
         
         # AUTO-BET LOGIC
