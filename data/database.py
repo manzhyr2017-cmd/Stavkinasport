@@ -44,6 +44,9 @@ class SignalLog(Base):
 
     id = Column(String, primary_key=True)
     match_id = Column(String)
+    sport = Column(String)
+    league = Column(String)
+    match_name = Column(String)  # Team A vs Team B
     market = Column(String)
     outcome = Column(String)
     model_probability = Column(Float)
@@ -51,7 +54,11 @@ class SignalLog(Base):
     bookmaker_name = Column(String)
     edge = Column(Float)
     stake_amount = Column(Float)
-    status = Column(String)
+    status = Column(String)      # pending, won, lost, void
+    result_score = Column(String, nullable=True) # "2-1"
+    closing_odds = Column(Float, nullable=True)
+    ai_analysis = Column(String, nullable=True)
+    metadata = Column(JSON, nullable=True)        # Store xG stats, news snippets at bet time
     created_at = Column(DateTime, default=datetime.utcnow)
 
 class BankrollSnapshot(Base):

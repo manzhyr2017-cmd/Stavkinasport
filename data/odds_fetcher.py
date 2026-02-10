@@ -310,9 +310,11 @@ class OddsDataFetcher:
                 if resp.status == 200:
                     return await resp.json()
                 elif resp.status == 401:
-                    logger.error("Invalid API key!")
+                    logger.error("❌ Invalid Odds API key! Disabling further API requests.")
+                    self.api_key = None # Prevent further requests
                 elif resp.status == 429:
-                    logger.warning("Rate limit exceeded!")
+                    logger.warning("⚠️ Odds API Rate limit exceeded!")
+                    self._requests_remaining = 0
                 else:
                     text = await resp.text()
                     logger.error(f"API error {resp.status}: {text}")

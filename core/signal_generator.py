@@ -244,6 +244,9 @@ class SignalGenerator:
         if self.notifier:
             await self._notify(manual_signals[:5], active_exp[:3], systems[:2])
 
+        # 7. Persist for Dashboard Intelligence
+        await self._persist_signals(active)
+
         self._signals_today.extend(active)
 
         return {
@@ -429,6 +432,48 @@ class SignalGenerator:
             except Exception as e:
                 logger.error(f"Enrichment failed for {s.id}: {e}")
                 s.analysis = "Технический анализ: Ставка подтверждена математической моделью."
+
+    async def _persist_signals(self, signals: List[ValueSignal]):
+        """Сохранение сигналов в базу данных для истории и обучения"""
+        from data.database import AsyncSessionLocal, SignalLog
+        from sqlalchemy import select
+        
+        async with AsyncSessionLocal() as session:
+            for s in signals:
+                if s.edge < 0.02: continue  # Сохраняем только значимые сигналы
+                
+                try:
+                    # Проверяем, есть ли уже такой сигнал
+                    stmt = select(SignalLog).where(SignalLog.id == s.id)
+                    res = await session.execute(stmt)
+                    existing = res.scalar_one_or_none()
+                    
+                    if not existing:
+                        log = SignalLog(
+                            id=s.id,
+                            match_id=s.match.id if s.match else "unknown",
+                            sport=s.match.sport if s.match else "unknown",
+                            league=s.match.league if s.match else "unknown",
+                            match_name=f"{s.match.home_team} vs {s.match.away_team}" if s.match else "N/A",
+                            market=s.market.value if hasattr(s.market, 'value') else str(s.market),
+                            outcome=s.outcome.value if hasattr(s.outcome, 'value') else str(s.outcome),
+                            model_probability=s.model_probability,
+                            bookmaker_odds=s.bookmaker_odds,
+                            bookmaker_name=s.bookmaker_name,
+                            edge=s.edge,
+                            stake_amount=s.stake_amount,
+                            status=s.status.value if hasattr(s.status, 'value') else str(s.status),
+                            ai_analysis=s.analysis,
+                            metadata={
+                                "lstm_trend": s.lstm_prediction.get('expected_move') if s.lstm_prediction else 0,
+                                "sharp_agrees": s.sharp_agrees
+                            }
+                        )
+                        session.add(log)
+                except Exception as e:
+                    logger.error(f"Error persisting signal {s.id}: {e}")
+            
+            await session.commit()
 
     def _generate_analysis(self, s: ValueSignal) -> str:
         reasons = []
