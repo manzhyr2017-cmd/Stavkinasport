@@ -16,7 +16,7 @@
 import logging
 import math
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Dict, List
 
 from config.settings import betting_config
@@ -34,7 +34,7 @@ class BetRecord:
     match_info: str = ""   # "Team A vs Team B (Outcome)"
     result: str = "pending"
     profit: float = 0.0
-    timestamp: datetime = field(default_factory=datetime.utcnow)
+    timestamp: datetime = field(default_factory=lambda: datetime.now(timezone.utc).replace(tzinfo=None))
 
 
 class BankrollManager:
@@ -48,7 +48,7 @@ class BankrollManager:
         self.bet_history: List[BetRecord] = []
         self._daily_pnl: float = 0.0
         self._weekly_pnl: float = 0.0
-        self._daily_reset: datetime = datetime.utcnow().replace(
+        self._daily_reset: datetime = datetime.now(timezone.utc).replace(tzinfo=None).replace(
             hour=0, minute=0, second=0
         )
         self._losing_streak: int = 0
@@ -335,7 +335,7 @@ class BankrollManager:
         logger.warning(f"Bet not found: {signal_id}")
 
     def _update_periods(self):
-        now = datetime.utcnow()
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
         if now.date() > self._daily_reset.date():
             self._daily_pnl = 0.0
             self._daily_reset = now.replace(hour=0, minute=0, second=0)

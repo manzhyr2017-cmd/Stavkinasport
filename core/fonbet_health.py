@@ -48,12 +48,18 @@ class FonbetEndpointManager:
 
     # Все известные endpoints (обновлять при необходимости)
     KNOWN_ENDPOINTS = [
+        "https://line-01.ccf4ab51771cacd46d.com",
+        "https://line-02.ccf4ab51771cacd46d.com",
+        "https://line-03.ccf4ab51771cacd46d.com",
+        "https://line-01.cdnbk.net",
+        "https://line-02.cdnbk.net",
+        "https://line-01.fon.bet",
+        "https://line-02.fon.bet",
         "https://line1.bk6.top",
         "https://line2.bk6.top",
         "https://line3.bk6.top",
         "https://line04.bk6.top",
         "https://line05.bk6.top",
-        # Альтернативные домены (могут появляться):
         "https://line1.bk10.top",
         "https://line2.bk10.top",
     ]

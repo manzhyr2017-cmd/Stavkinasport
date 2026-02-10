@@ -950,7 +950,7 @@ class RuBettingAssistant:
         self.value_engine = MultiSportValueEngine()
         self.express_optimizer = FonbetExpressOptimizer()
 
-    async def scan(self, include_live: bool = False) -> dict:
+    async def scan(self, include_live: bool = True) -> dict:
         """Полное сканирование"""
         # 1. Парсим линию
         prematch = await self.fonbet.fetch_line(live=False)
@@ -989,6 +989,7 @@ class RuBettingAssistant:
 
         return {
             "matches": len(all_matches),
+            "raw_matches": all_matches,
             "by_sport": by_sport,
             "value_bets": value_bets[:20],
             "expresses": final_expresses[:10],

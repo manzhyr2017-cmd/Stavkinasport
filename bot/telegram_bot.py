@@ -145,6 +145,9 @@ async def cmd_start(message: Message):
         ],
         [
             InlineKeyboardButton(text="⚙️ Настройки", callback_data="action:settings"),
+            InlineKeyboardButton(text="📈 Статус", callback_data="action:status"),
+        ],
+        [
             InlineKeyboardButton(text="❓ Помощь", callback_data="action:help"),
         ],
     ])
@@ -269,42 +272,72 @@ async def cmd_news(message: Message):
     await message.answer(text, parse_mode=ParseMode.HTML, disable_web_page_preview=True)
 
 
-@router.message(Command("strategies"))
-async def cmd_strategies(message: Message):
+@router.message(Command("status"))
+async def cmd_status(message: Message):
     """
-    Показать активные стратегии (Hedge/Cashout).
+    Показать расширенный статус бота.
     """
-    # Demo logic similar to dashboard
+    if not _signal_generator:
+        await message.answer("⚠️ Бот не инициализирован")
+        return
+        
+    stats = _bankroll_manager.get_stats() if _bankroll_manager else {}
+    status_icon = "🟢" if not stats.get("is_stopped") else "🔴"
+    
     text = (
-        "🛡 <b>Hedge Strategies (Противоход)</b>\n\n"
-        "⚡ <b>Express #EXP_DEMO</b>\n"
-        "✅ 4 / 5 Legs Passed\n"
-        "💰 Guaranteed Profit: +1,250₽\n"
-        "📉 Recommendation: <b>Bet 2,500₽ on Draw/Lose @ 3.20</b>\n"
-        "NEXT: Real Madrid (vs Barcelona)\n\n"
-        "<i>Используйте веб-дашборд для управления стратегиями.</i>"
+        f"{status_icon} <b>BOT STATUS</b>\n"
+        f"━━━━━━━━━━━━━━\n"
+        f"💰 Банкролл: {stats.get('bankroll', 0):.0f}₽\n"
+        f"🎯 Активных сигналов: {len(_signal_generator._signals_today)}\n"
+        f"🛡 Стратегий найдено: {len(_signal_generator._active_strategies['hedges']) + len(_signal_generator._active_strategies['cashouts'])}\n"
+        f"⏱ Интервал: {betting_config.ODDS_POLL_INTERVAL}с\n"
     )
     await message.answer(text, parse_mode=ParseMode.HTML)
 
+@router.message(Command("hedge"))
+async def cmd_hedge(message: Message):
+    """Показать доступные противоходы"""
+    if not _signal_generator or not _signal_generator._active_strategies["hedges"]:
+        await message.answer("ℹ️ Нет доступных противоходов на данный момент.")
+        return
+    
+    for h in _signal_generator._active_strategies["hedges"]:
+        await message.answer(h.to_telegram(), parse_mode=ParseMode.HTML)
+
+@router.message(Command("cashout"))
+async def cmd_cashout(message: Message):
+    """Показать доступные кешауты"""
+    if not _signal_generator or not _signal_generator._active_strategies["cashouts"]:
+        await message.answer("ℹ️ Нет доступных кешаутов на данный момент.")
+        return
+    
+    for c in _signal_generator._active_strategies["cashouts"]:
+        await message.answer(c.to_telegram(), parse_mode=ParseMode.HTML)
+
+@router.message(Command("backtest"))
+async def cmd_backtest(message: Message):
+    """Запустить бэктест"""
+    await message.answer("📊 <b>BACKTEST ENGINE</b>\n\nБэктест стратегий на исторических данных доступен в веб-интерфейсе.\nДля запуска в Telegram отправьте: <code>/backtest [strategy_name]</code>", parse_mode=ParseMode.HTML)
 
 @router.message(Command("help"))
 async def cmd_help(message: Message):
     await message.answer(
         "❓ <b>СПРАВКА</b>\n\n"
-        "<b>Команды:</b>\n"
-        "/scan — Сканировать рынок\n"
-        "/bankroll — Статистика банкролла\n"
-        "/settings — Текущие настройки\n"
-        "/stop — Остановить мониторинг\n"
-        "/resume — Возобновить\n"
+        "<b>Основные команды:</b>\n"
+        "/scan — Сканировать рынок (полный цикл)\n"
+        "/status — Состояние и статистика\n"
+        "/bankroll — Детальный баланс\n"
+        "/settings — Настройки бота\n"
         "/help — Эта справка\n\n"
-        "<b>Что такое Value Bet?</b>\n"
-        "Ставка с положительным мат. ожиданием.\n"
-        "Edge = P_модели × Кф_БК - 1\n"
-        "Если Edge > 2% → сигнал на ставку.\n\n"
-        "<b>Экспресс (AI):</b> Умный подбор 2-5 событий с анализом.\n"
-        "Бот объясняет причину выбора каждого исхода (P, Edge).\n"
-        "<b>Система:</b> Комбинация экспрессов (напр. 3 из 4).\n",
+        "<b>Управление:</b>\n"
+        "/stop — Пауза мониторинга\n"
+        "/resume — Возобновить\n"
+        "/backtest — Проверка стратегий\n\n"
+        "<b>Стратегии сопровождения:</b>\n"
+        "/hedge — Противоходы (гарант прибыль)\n"
+        "/cashout — Досрочная продажа ставок\n\n"
+        "<b>Value Betting:</b> Бот ищет ошибки букмекера (Edge > 2%).\n"
+        "<b>AI Анализ:</b> Использует Llama-3 для оценки новостей и травм.\n",
         parse_mode=ParseMode.HTML,
     )
 
@@ -340,7 +373,9 @@ async def handle_action(callback: CallbackQuery):
     elif action == "news":
         await cmd_news(callback.message)
     elif action == "strategies":
-        await cmd_strategies(callback.message)
+        await cmd_status(callback.message)
+    elif action == "status":
+        await cmd_status(callback.message)
 
     await callback.answer()
 

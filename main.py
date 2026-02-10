@@ -12,18 +12,22 @@ import argparse
 import asyncio
 import logging
 import sys
-
 from config.settings import api_config, tg_config
+import os
+from core.logging_config import setup_logging
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s | %(levelname)-7s | %(name)s | %(message)s",
-    datefmt="%Y-%m-%d %H:%M:%S",
-    handlers=[
-        logging.StreamHandler(sys.stdout),
-        logging.FileHandler("betting_v2.log", encoding="utf-8"),
-    ],
-)
+if os.getenv("LOG_FORMAT", "").upper() == "JSON":
+    setup_logging(level=logging.INFO, log_file="logs/bot.json")
+else:
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s | %(levelname)-7s | %(name)s | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+        handlers=[
+            logging.StreamHandler(sys.stdout),
+            logging.FileHandler("betting_v2.log", encoding="utf-8"),
+        ],
+    )
 logger = logging.getLogger(__name__)
 
 

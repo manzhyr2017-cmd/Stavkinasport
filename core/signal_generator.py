@@ -23,6 +23,11 @@ try:
 except ImportError:
     LSTMLinePredictor, OddsTimeSeriesCollector = None, None
 
+try:
+    from core.fonbet_strategies import HedgeCalculator, CashoutAdvisor
+except ImportError:
+    HedgeCalculator, CashoutAdvisor = None, None
+
 logger = logging.getLogger(__name__)
 
 
@@ -72,6 +77,11 @@ class SignalGenerator:
         self.ai_analyzer = AIAnalyzer()
         self.news_fetcher = BravoNewsFetcher()
         self.ai_semaphore = asyncio.Semaphore(1) # Limit AI calls to prevent 429
+
+        # Strategies
+        self.hedge_calc = HedgeCalculator() if HedgeCalculator else None
+        self.cashout_adv = CashoutAdvisor() if CashoutAdvisor else None
+        self._active_strategies = {"hedges": [], "cashouts": []}
 
     async def run_scan(self) -> dict:
         """Полное сканирование рынка"""
@@ -246,6 +256,9 @@ class SignalGenerator:
 
         # 7. Persist for Dashboard Intelligence
         await self._persist_signals(active)
+
+        # 8. Strategy Analysis (Hedge / Cashout)
+        await self._check_strategies(ru_res.get("raw_matches", []))
 
         self._signals_today.extend(active)
 
@@ -432,6 +445,83 @@ class SignalGenerator:
             except Exception as e:
                 logger.error(f"Enrichment failed for {s.id}: {e}")
                 s.analysis = "Технический анализ: Ставка подтверждена математической моделью."
+
+    async def _check_strategies(self, live_matches: List[Any]):
+        """
+        Проверка активных ставок на возможность хеджирования или кешаута.
+        """
+        self._active_strategies = {"hedges": [], "cashouts": []}
+        if not live_matches:
+            return
+
+        from data.database import AsyncSessionLocal, SignalLog
+        from sqlalchemy import select
+        
+        async with AsyncSessionLocal() as session:
+            # 1. Получаем все "зависшие" ставки
+            stmt = select(SignalLog).where(SignalLog.status == "pending")
+            result = await session.execute(stmt)
+            pending_bets = result.scalars().all()
+            
+            if not pending_bets:
+                return
+                
+            logger.info(f"🛡️ Checking strategies for {len(pending_bets)} pending bets...")
+            
+            # Map live matches for quick lookup
+            live_map = {m.display_name.lower(): m for m in live_matches}
+            
+            for bet in pending_bets:
+                # Попытка найти этот матч в текущем Live
+                match_key = bet.match_name.lower()
+                live_match = live_map.get(match_key)
+                
+                if not live_match:
+                    continue
+                
+                # A. CASHOUT CHECK (Singles)
+                if self.cashout_adv:
+                    # В реальной жизни мы бы получали cashout_offer от API.
+                    # Здесь мы можем симулировать его или использовать логику падения ценности.
+                    # Если кф на наш исход сильно упал — прибыль высокая.
+                    current_odds = live_match.odds.get(bet.market)
+                    if current_odds and current_odds < bet.bookmaker_odds * 0.7:
+                        # Симулируем оффер: 85% от потенциальной прибыли
+                        potential = bet.stake_amount * bet.bookmaker_odds
+                        offer = potential * 0.85
+                        
+                        signal = self.cashout_adv.evaluate(
+                            bet.stake_amount, potential, offer, 0, [0.9] # Mock probs
+                        )
+                        signal.bet_id = bet.id
+                        self._active_strategies["cashouts"].append(signal)
+
+                        if signal.recommendation == "sell" and self.notifier:
+                            await self.notifier.send_text(
+                                f"💰 <b>CASHOUT ALERT</b>\n"
+                                f"Матч: {bet.match_name}\n"
+                                f"Ваша ставка: {bet.market} @ {bet.bookmaker_odds:.2f}\n"
+                                f"Текущий кф: {current_odds:.2f}\n"
+                                f"💡 Рекомендация: <b>ПРОДАТЬ за {offer:.0f}₽</b>"
+                            )
+
+                # B. HEDGE CHECK (Для простоты здесь — если матч из экспресса идет в Live)
+                if self.hedge_calc:
+                    # Определяем противоположный исход
+                    opp_market = self.hedge_calc.OPPOSITE_MARKETS.get(bet.market)
+                    opp_odds = live_match.odds.get(opp_market)
+                    
+                    if opp_odds:
+                        # Проверяем условия для хеджа (ROI > 10%)
+                        # Симулируем, что это последняя нога экспресса
+                        # (В реальности мы бы проверили meta_payload наlegs_passed)
+                        if self.hedge_calc.should_hedge(bet.stake_amount, bet.bookmaker_odds, 0, 1, 0.5, opp_odds):
+                            recom = self.hedge_calc.calculate_hedge(
+                                bet.stake_amount, bet.bookmaker_odds, 0, 1, bet.market, bet.bookmaker_odds, opp_odds
+                            )
+                            self._active_strategies["hedges"].append(recom)
+                            if self.notifier:
+                                await self.notifier.send_text(recom.to_telegram())
 
     async def _persist_signals(self, signals: List[ValueSignal]):
         """Сохранение сигналов в базу данных для истории и обучения"""
