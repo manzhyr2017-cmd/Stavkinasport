@@ -26,6 +26,18 @@ class TestFonbetParser:
         assert 1845 in fm  # ОЗ Да
         assert 1846 in fm  # ОЗ Нет
 
+    @pytest.mark.asyncio
+    async def test_ai_generation_skip_if_no_key(self):
+        """Тест AI: пропускаем если нет ключа (CI/CD)"""
+        import os
+        from core.ai_analyzer import AIAnalyzer
+        key = os.getenv("NVIDIA_API_KEY")
+        if not key:
+            pytest.skip("NVIDIA_API_KEY not set")
+        
+        analyzer = AIAnalyzer(key)
+        assert analyzer.model is not None
+
     def test_sport_map_coverage(self):
         """Все основные виды спорта замаплены"""
         from core.ru_bookmakers import FonbetParser
